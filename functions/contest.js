@@ -1,72 +1,221 @@
 const sendMessage = require('../lib/telegram/sendMessage');
 const { setState, getState, clearState } = require('../lib/supabase/subscribe/setState');
-const { setContest, getContestByUserId, getAllContest, deleteContest } = require('../lib/supabase/subscribe/setContest');
+const { setContest, getContestByUserId, getAllContest, deleteContest, getContest } = require('../lib/supabase/subscribe/setContest');
 const chatMemberChange = require('../lib/supabase/subscribe/chatMemberChange');
 const setInviteLink = require('../lib/supabase/subscribe/setInviteLink');
 const { getUserById, setUser, getAllUsersByStatus } = require('../lib/supabase/subscribe/setUser');
 const { getChatMemberByUserId, addChatMember } = require('../lib/supabase/subscribe/addChatMember');
+const client = require('../lib/supabase/subscribe/client');
 
 exports.handler = async function (event, ctx) {
-	const { message, edited_message, channel_post, message_reaction, pre_checkout_query, chat_member, my_chat_member, chat_join_request } =
-		JSON.parse(event.body);
+	const {
+		message,
+		callback_query,
+		edited_message,
+		channel_post,
+		message_reaction,
+		pre_checkout_query,
+		chat_member,
+		my_chat_member,
+		chat_join_request,
+	} = JSON.parse(event.body);
+	// console.log('event.body ', event.body);
+
+	if (callback_query) {
+		// console.log('callback_query ', callback_query);
+		let { message, data } = callback_query;
+		let { contest_id } = await getState(message.chat.id);
+		//прерывая процесс добавления конкурса - удаляем запись и обнуляем стейт
+		if (data === '/cancel') {
+			await clearState(message.chat.id);
+			await deleteContest(contest_id);
+			await sendMessage(message.chat.id, 'Создание конкурса/розыгрыша прервано');
+			return { statusCode: 200 };
+		}
+	}
 
 	if (chat_member) {
 		let user_id = chat_member?.from.id;
 		let chat_id = chat_member?.chat.id;
+		// console.log('chat_member ', chat_member);
+		// console.log('my_chat_member ', my_chat_member);
 
 		let user = await getUserById(user_id);
 		let chatMember = await getChatMemberByUserId(user_id, chat_id);
 		// console.log('user ', user);
 
-		if (!chatMember.message) {
-			chatMember = await chatMemberChange({
-				user_id,
-				old_status: chat_member?.old_chat_member?.status,
-				new_status: chat_member?.new_chat_member?.status,
-				invite_link: user?.invite_link,
-			});
+		if (user) {
+			if (!chatMember.message) {
+				chatMember = await chatMemberChange({
+					user_id,
+					old_status: chat_member?.old_chat_member?.status,
+					new_status: chat_member?.new_chat_member?.status,
+					invite_link: user.invite_link,
+				});
+			} else {
+				chatMember = await addChatMember({
+					user_id,
+					chat_id,
+					old_status: chat_member?.old_chat_member?.status,
+					new_status: chat_member?.new_chat_member?.status,
+					invite_link: user?.invite_link,
+				});
+			}
 		} else {
-			chatMember = await addChatMember({
-				user_id,
-				chat_id,
-				old_status: chat_member?.old_chat_member?.status,
-				new_status: chat_member?.new_chat_member?.status,
-				invite_link: user?.invite_link,
-			});
+			await setUser(chat_member?.from);
 		}
 
 		// console.log(chatMember);
 		// console.log('chat_member ', chat_member);
 
-		let sendMessage_;
-		if (chat_member?.new_chat_member?.status !== 'left' || chat_member?.new_chat_member?.status !== 'kicked') {
-			sendMessage_ = await sendMessage(chat_member?.chat.id, `Привет ${chat_member?.from.first_name}\n${chat_member?.from.last_name}`);
+		if (chat_member?.new_chat_member?.status === 'member' || chat_member?.new_chat_member?.status === 'creator') {
+			await sendMessage(
+				chat_member?.from.id,
+				`${chat_member?.from.first_name} ${chat_member?.from.last_name}, спасибо, мы увидели что вы подписались на канал, желаем победы в конкурсе`
+			);
+		}
+		if (chat_member?.new_chat_member?.status === 'left') {
+			await sendMessage(
+				chat_member?.from.id,
+				`${chat_member?.from.first_name} ${chat_member?.from.last_name}, сожалеем, что вы отписались`
+			);
 		}
 
-		return {
-			statusCode: 200,
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({ message: 'ok', chatMember }),
-		};
+		return { statusCode: 200 };
 	}
 
 	if (message) {
 		const { chat, from, text } = message;
-		// console.log('from ', from);
 		// return;
 		let { state, contest_id } = await getState(from.id);
 
-		if (text.split(' ')[0] === '/start') {
-			let user = await setUser(from);
-			console.log('user ', user);
+		if (text === '/cancel') {
+			await clearState(from.id);
+			await deleteContest(contest_id);
+			return { statusCode: 200 };
+		}
 
-			//добавление дип ссылки пользователю по user_id если она есть в запросе
+		if (text?.split(' ')[0] === '/start') {
+			let user = await setUser(from);
+			//если есть параметр после start zJgdfJ-fsddfg-dfgfgdh-
 			if (text.split(' ')[1]) {
-				let invite_link = await setInviteLink({ user_id: from.id, invite_link: text.split(' ')[1] });
-				console.log('invite_link ', invite_link);
+				let hvost = text.split(' ')[1];
+				let id = hvost.split('_')[0];
+				let invite_link = `+${hvost.replace('_', '+')?.split('+')[1]}`;
+				user = await setUser({ ...from, invite_link });
+
+				//проверяем наличие конкурса по contest_id
+				let contest = await getContest(id);
+				if (contest?.message) {
+					await sendMessage(
+						'305905070',
+						`Произошла ошибка getContest: ${contest?.message}
+					\ninvite_link: ${invite_link}
+					\ncontest_id: ${id}`
+					);
+					await sendMessage(user.user_id, `Конкурс не найден.\nПроверьте, пожалуйста ссылку, либо он был удалён!`);
+				} else if (contest) {
+					let now = new Date().getTime();
+					let finish = new Date(contest.finish_date).getTime();
+					//проверяем попадает ли в срок подведения итогов
+					if (now > finish) {
+						await sendMessage(
+							user.user_id,
+							`Конкурс был завершен ${new Date(contest.finish_date)
+								.toLocaleString()
+								.replace(/(\d+).(\d+).(\d+), (\d+):(\d+):(\d+)/, '$1.$2.$3 $4:$5')}`
+						);
+					} else {
+						//отправляем текст с условиями конкурса и кнопку подписаться
+						console.log(hvost);
+						console.log(invite_link);
+						console.log(`https://t.me/${invite_link}`);
+						await sendMessage(user.user_id, `${contest.message_start}`, {
+							inline_keyboard: [[{ text: 'Подписаться', url: `https://t.me/${invite_link}` }]],
+						});
+					}
+				}
 			}
+		}
+
+		if (text == '/runtest') {
+			// return { statusCode: 200 };
+
+			//1. Запускаем скрипт каждые 3 минуты (ставим в крон задание)
+			//2. Скрипт запрашивает конкурсы, в которых статус pending и start_date > now() (func get_start_all_date)
+			//3. Если массив конкурсов не пустой - запрашиваем в цикле chat_member со статусом member и выбираем рандомно winner_count
+
+			// const { data, error } = await client.from('contest_config').select('*, chat_member (id, new_status)');
+			// console.log('data ', data);
+
+			// return { statusCode: 200 };
+
+			//return start_day[]
+			const { data: finish_date_array, error: finishDateArrayError } = await client
+				.rpc('get_start_all_date')
+				.select('title, status, winner_count, chat_id')
+				.eq('status', 'pending');
+
+			let winner_message = [];
+
+			//3. Если массив конкурсов не пустой - проходим в цикле по конкурсам и последовательно запрашиваем chat_member со статусом member и выбираем рандомно winner_count
+			if (finish_date_array.length > 0) {
+				// console.log('finish_date_array ', finish_date_array);
+
+				//проходим в цикле по конкурсам и последовательно запрашиваем chat_member со статусом member
+				for await (const contest of finish_date_array) {
+					console.log('contest ', contest);
+					//return user_id[]
+					const { data: winner, error: winnerError } = await client
+						.from('chat_member')
+						.select('new_status')
+						.eq('new_status', 'member')
+						.eq('chat_id', contest.chat_id)
+						.select('user_id');
+					console.log('winners ', winner);
+
+					if (winner?.length > 0) {
+						//return users[]
+						const { data: users, error: usersError } = await client
+							.from('users')
+							.select('*')
+							.in(
+								'user_id',
+								winner.map((i) => i.user_id)
+							);
+						console.log('users ', users);
+
+						winner_message.push(
+							`Конкурс "${contest.title}":\n${
+								users.length == 0 ? 'Нет победителей\n' : users.map((i, _) => `${++_}. ${i.first_name} ${i.last_name}`).join('\n')
+							}`
+						);
+					}
+				}
+			} else {
+				return { statusCode: 200 };
+			}
+			// console.log('winner_message ', winner_message);
+
+			//return user_id[]
+			// const { data: winner, error: winnerError } = await client
+			// 	.from('chat_member')
+			// 	.select('new_status')
+			// 	.eq('new_status', 'left')
+			// 	.select('user_id');
+
+			// console.log('winner ', winner);
+
+			// //return users[]
+			// const { data: users, error: usersError } = await client
+			// 	.from('users')
+			// 	.select('*')
+			// 	.in(
+			// 		'user_id',
+			// 		winner.map((i) => i.user_id)
+			// 	);
+
+			await sendMessage(chat.id, `Поздравляем победителей:\n${winner_message.join('\n')}`);
 		}
 
 		if (text === '/allcontest' && state === null) {
@@ -107,64 +256,111 @@ exports.handler = async function (event, ctx) {
 			);
 		}
 
-		//прерывая процесс добавления конкурса - удаляем запись и обнуляем стейт
-		if (text === '/cancel') {
-			await clearState(from.id);
-			await deleteContest(contest_id);
+		if (text === '/id') {
+			console.log('chat  ', chat);
+			await sendMessage(chat.id, `<code>${chat.id}</code>`);
+
 			return { statusCode: 200 };
 		}
 
 		//добавление розыгрыша
 		if (text === '/addcontest' && state === null) {
-			await sendMessage(chat.id, `Введи название розыгрыша\n<i>для прерывания и выхода нажмите /cancel</i>`);
-			let { id } = await setContest({ chat_id: chat.id, owner: from.id });
-			await setState({ user_id: from.id, state: '1', contest_id: id });
+			await sendMessage(chat.id, `Введи название розыгрыша`, {
+				inline_keyboard: [[{ text: 'Отмена', callback_data: '/cancel' }]],
+			});
+			let { id } = await setContest({ owner: from.id });
+			// console.log('data ', data);
+			// console.log('error ', error);
+			await setState({ user_id: from.id, state: 'start', contest_id: id });
 		}
-		if (state == 1) {
+		if (state == 'start') {
+			await sendMessage(chat.id, `Введи текст объявления конкурса`, {
+				inline_keyboard: [[{ text: 'Отмена', callback_data: '/cancel' }]],
+			});
+			await setState({ user_id: from.id, state: 'title' });
+			await setContest({ contest_id, owner: from.id, title: text });
+		}
+		if (state == 'title') {
 			await sendMessage(
 				chat.id,
-				`Введи текст объявления конкурса
-      \n<i>для прерывания и выхода нажмите /cancel</i>`
+				`Введите id канала или группы
+			\nЕсли канал - то можно просто переслать сюда любое сообщение из целевого канала
+			\nЕсли группа - то введите команду /id непосредственно в целевой группе`,
+				{
+					inline_keyboard: [[{ text: 'Отмена', callback_data: '/cancel' }]],
+				}
 			);
-			await setState({ user_id: from.id, state: '2' });
-			await setContest({ contest_id, chat_id: chat.id, owner: from.id, title: text });
+			await setState({ user_id: from.id, state: 'message_start' });
+			await setContest({ contest_id, owner: from.id, message_start: text });
 		}
-		if (state == 2) {
-			await sendMessage(
-				chat.id,
-				`Введи дату начала проведения конкурса
-      \nОбязательно в формате <code>2024.03.23 19:00</code>
-      \n<i>для прерывания и выхода нажмите /cancel</i>`
-			);
-			await setState({ user_id: from.id, state: '3' });
-			await setContest({ contest_id, chat_id: chat.id, owner: from.id, message_start: text });
+		// if (state == 'chat_id') {
+		// 	await sendMessage(
+		// 		chat.id,
+		// 		`Введи дату начала проведения конкурса
+		//   \nОбязательно в формате <code>2024.03.23 19:00</code>`,
+		// 		{
+		// 			inline_keyboard: [[{ text: 'Отмена', callback_data: '/cancel' }]],
+		// 		}
+		// 	);
+		// 	await setState({ user_id: from.id, state: '3' });
+		// 	await setContest({ contest_id, chat_id: chat.id, owner: from.id, message_start: text });
+		// }
+		if (state == 'message_start') {
+			let { forward_origin } = message;
+			let chat_id = forward_origin?.chat?.id;
+			console.log('forward_origin ', forward_origin);
+
+			if (chat_id || text.length > 6) {
+				if (chat_id) {
+					await setState({ user_id: from.id, state: 'chat_id' });
+					await setContest({ contest_id, chat_id, owner: from.id });
+				} else {
+					await setState({ user_id: from.id, state: 'chat_id' });
+					await setContest({ contest_id, chat_id: text, owner: from.id });
+				}
+				await sendMessage(
+					chat.id,
+					`Введи дату окончания проведения конкурса
+					\nОбязательно в формате <code>25.03.2024 23:00</code>`,
+					{
+						inline_keyboard: [[{ text: 'Отмена', callback_data: '/cancel' }]],
+					}
+				);
+			} else {
+				await sendMessage(chat.id, `Вы не ввели id канала/группы или ввели его не верно\nПопробуйте еще раз`, {
+					inline_keyboard: [[{ text: 'Отмена', callback_data: '/cancel' }]],
+				});
+			}
 		}
-		if (state == 3) {
-			await sendMessage(
-				chat.id,
-				`Введи дату окончания проведения конкурса
-        \nОбязательно в формате <code>2024.03.25 23:00</code>
-        \n<i>для прерывания и выхода нажмите /cancel</i>`
-			);
-			await setState({ user_id: from.id, state: '4' });
-			await setContest({ contest_id, chat_id: chat.id, owner: from.id, start_date: text });
+		if (state == 'chat_id') {
+			// return { statusCode: 200 };
+			let finish_date = new Date(text.replace(/(\d+).(\d+).(\d+) (\d+):(\d+)/, '$2.$1.$3 $4:$5')).toISOString();
+			if (finish_date) {
+				await sendMessage(chat.id, `Введи количество победителей`, {
+					inline_keyboard: [[{ text: 'Отмена', callback_data: '/cancel' }]],
+				});
+				await setState({ user_id: from.id, state: 'finish_date' });
+				await setContest({ contest_id, owner: from.id, finish_date });
+			} else {
+				await sendMessage(
+					chat.id,
+					`Введи корректно дату окончания проведения конкурса
+				\nОбязательно в формате <code>25.03.2024 23:00</code>`,
+					{
+						inline_keyboard: [[{ text: 'Отмена', callback_data: '/cancel' }]],
+					}
+				);
+			}
 		}
-		if (state == 4) {
-			await sendMessage(chat.id, `Введи количество победителей\n<i>для прерывания и выхода нажмите /cancel</i>`);
-			await setState({ user_id: from.id, state: '5' });
-			await setContest({ contest_id, chat_id: chat.id, owner: from.id, finish_date: text });
+		if (state == 'finish_date') {
+			await sendMessage(chat.id, `Введи текст для награждения победителей`, {
+				inline_keyboard: [[{ text: 'Отмена', callback_data: '/cancel' }]],
+			});
+			await setState({ user_id: from.id, state: 'winner_count' });
+			await setContest({ contest_id, owner: from.id, winner_count: text });
 		}
-		if (state == 5) {
-			await sendMessage(
-				chat.id,
-				`Введи текст для награждения победителей\n
-      <i>для прерывания и выхода нажмите /cancel</i>`
-			);
-			await setState({ user_id: from.id, state: '6' });
-			await setContest({ contest_id, chat_id: chat.id, owner: from.id, winner_count: text });
-		}
-		if (state == 6) {
-			let contest = await setContest({ contest_id, chat_id: chat.id, owner: from.id, message_finish: text });
+		if (state == 'winner_count') {
+			let contest = await setContest({ contest_id, owner: from.id, message_finish: text });
 			await sendMessage(
 				chat.id,
 				`Параметры конкурса:\nНазвание: ${contest.title}\nТекст объявления: ${contest.message_start}
