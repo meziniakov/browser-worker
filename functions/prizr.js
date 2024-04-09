@@ -231,13 +231,12 @@ exports.handler = async function (event, ctx) {
 		}
 
 		//добавление розыгрыша
-		if (text === '/addcontest' && state === null) {
+		if (text === '/addcontest') {
+			await setState({ user_id: from.id, state: null });
 			await sendMessage(chat.id, `Введи название розыгрыша`, {
 				inline_keyboard: [[{ text: 'Отмена', callback_data: '/cancel' }]],
 			});
 			let { id } = await setContest({ owner: from.id });
-			// console.log('data ', data);
-			// console.log('error ', error);
 			await setState({ user_id: from.id, state: 'start', contest_id: id });
 		}
 		if (state == 'start') {
@@ -275,16 +274,23 @@ exports.handler = async function (event, ctx) {
 		if (state == 'message_start') {
 			let { forward_origin } = message;
 			let chat_id = forward_origin?.chat?.id;
-			console.log('forward_origin ', forward_origin);
+			let next = false;
 
-			if (chat_id || text.length > 6) {
-				if (chat_id) {
-					await setState({ user_id: from.id, state: 'chat_id' });
-					await setContest({ contest_id, chat_id, owner: from.id });
-				} else {
-					await setState({ user_id: from.id, state: 'chat_id' });
-					await setContest({ contest_id, chat_id: text, owner: from.id });
-				}
+			if (chat_id) {
+				await client.from('chats').upsert(forward_origin?.chat);
+				await setState({ user_id: from.id, state: 'chat_id' });
+				await setContest({ contest_id, chat_id, owner: from.id });
+				next = true;
+			} else if (text.length > 6 && typeof text == 'number') {
+				await setState({ user_id: from.id, state: 'chat_id' });
+				await setContest({ contest_id, chat_id: text, owner: from.id });
+				next = true;
+			} else {
+				await sendMessage(chat.id, `Вы не ввели id канала/группы или ввели его не верно\nПопробуйте еще раз`, {
+					inline_keyboard: [[{ text: 'Отмена', callback_data: '/cancel' }]],
+				});
+			}
+			if (next) {
 				await sendMessage(
 					chat.id,
 					`Введи дату окончания проведения конкурса
@@ -293,10 +299,6 @@ exports.handler = async function (event, ctx) {
 						inline_keyboard: [[{ text: 'Отмена', callback_data: '/cancel' }]],
 					}
 				);
-			} else {
-				await sendMessage(chat.id, `Вы не ввели id канала/группы или ввели его не верно\nПопробуйте еще раз`, {
-					inline_keyboard: [[{ text: 'Отмена', callback_data: '/cancel' }]],
-				});
 			}
 		}
 		if (state == 'chat_id') {
