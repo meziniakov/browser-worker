@@ -281,7 +281,7 @@ exports.handler = async function (event, ctx) {
 				await setState({ user_id: from.id, state: 'chat_id' });
 				await setContest({ contest_id, chat_id, owner: from.id });
 				next = true;
-			} else if (text.length > 6 && typeof text == 'number') {
+			} else if (text.length > 6) {
 				await setState({ user_id: from.id, state: 'chat_id' });
 				await setContest({ contest_id, chat_id: text, owner: from.id });
 				next = true;
