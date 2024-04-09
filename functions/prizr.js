@@ -91,6 +91,10 @@ exports.handler = async function (event, ctx) {
 		// return;
 		let { state, contest_id } = await getState(from.id);
 
+		if (text === '/me') {
+			await sendMessage(chat.id, `id: ${chat.id}\nusername: ${chat.username}`);
+		}
+
 		if (text === '/cancel') {
 			await clearState(from.id);
 			await deleteContest(contest_id);
