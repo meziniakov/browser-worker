@@ -6,7 +6,7 @@ const https = require('https');
 export default async (req) => {
 	process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0;
 	console.log('req ', await req.json());
-	let test = await sendMessage(305905070, `Пробное сообщение`);
+	// let test = await sendMessage(305905070, `Пробное сообщение`);
 
 	const { data, error } = await client.from('requests').select('*').eq('is_active', true);
 
@@ -63,9 +63,8 @@ export default async (req) => {
 				}),
 			});
 			const fetchKoef = await response.json();
-			let send = await editMessage(305905070, test.result.message_id, null, `Коээфициент по складу ${req.wh_id} сейчас: ${fetchKoef.coef}`);
-			console.log('fetchKoef ', fetchKoef);
-			console.log('send ', send);
+			let send = await sendMessage(305905070, test.result.message_id, null, `Коээфициент по складу ${req.wh_id} сейчас: ${fetchKoef.coef}`);
+			setTimeout(() => {}, 4000);
 		});
 	}
 };
