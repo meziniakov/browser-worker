@@ -4,15 +4,15 @@ const client = require('../lib/supabase/wb_acceptance/client');
 
 export default async (req) => {
 	// process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0;
-	// console.log('req ', await req.json());
-	// let test = await sendMessage(305905070, `Пробное сообщение`);
+	console.log('req ', await req.json());
+	let test = await sendMessage(305905070, `Пробное сообщение`);
 
 	// const { data, error } = await client.from('requests').select('*').eq('is_active', true);
 
-	const req = await fetch('https://jsonplaceholder.typicode.com/todos/1');
-	const res = await req.json();
-	console.log('req ', req);
-	console.log('res ', res);
+	// const req = await fetch('https://jsonplaceholder.typicode.com/todos/1');
+	// const res = await req.json();
+	// console.log('req ', req);
+	// console.log('res ', res);
 
 	// const response = await fetch('https://coef.wbcon.su/get_coef', {
 	// 	method: 'POST',
