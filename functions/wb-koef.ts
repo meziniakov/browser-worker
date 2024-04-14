@@ -123,7 +123,7 @@ exports.handler = async function (event, ctx) {
 
 		if (message) {
 			const { chat, text, from } = message;
-			const { data: user } = await client.from('users').select('*').eq('message_id', chat.id).single();
+			const { data: user } = await client.from('users').select('*').eq('id', chat.id).single();
 
 			if (text === '/add') {
 				if (user) {
