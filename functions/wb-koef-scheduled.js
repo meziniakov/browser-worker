@@ -4,7 +4,7 @@ const client = require('../lib/supabase/wb_acceptance/client');
 const https = require('https');
 
 export default async (req) => {
-	// process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0;
+	process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0;
 	console.log('req ', await req.json());
 	let test = await sendMessage(305905070, `Пробное сообщение`);
 
