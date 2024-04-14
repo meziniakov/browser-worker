@@ -26,7 +26,7 @@ export default async (req) => {
 	// console.log('fetchKoef ', fetchKoef);
 	// await sendMessage(chat.id, `Привет ${user.username}`);
 
-	console.log('process.env.WB_ACCEPTANCE_RATE_API_BOT ', process.env.WB_ACCEPTANCE_RATE_API_BOT);
+	console.log('process.env.WB_ACCEPTANCE_API_BOT ', process.env.WB_ACCEPTANCE_API_BOT);
 
 	let send = await sendMessage(305905070, 'Выполнение функции раз в 2 минут');
 	console.log('send Message ', send);
