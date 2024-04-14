@@ -90,11 +90,16 @@ exports.handler = async function (event, ctx) {
 					})
 					.select()
 					.single();
+
+				let today = new Date();
+				let week = today.setDate(today.getDate() + 7);
+				let tomorrow = today.setDate(today.getDate() + 1);
+
 				let deliveryDateMessage = await editMessage(user_id, state.message_id, null, 'Введите дату', {
 					inline_keyboard: [
-						[{ callback_data: '2024-04-14', text: '14-04-2024' }],
-						[{ callback_data: '2024-04-15', text: '15-04-2024' }],
-						[{ callback_data: '2024-04-16', text: '16-04-2024' }],
+						[{ callback_data: new Date().toISOString().split('T')[0], text: 'Сегодня' }],
+						[{ callback_data: new Date(tomorrow).toISOString().split('T')[0], text: 'Завтра' }],
+						[{ callback_data: new Date(week).toISOString().split('T')[0], text: 'Неделя' }],
 					],
 				});
 				await client.from('states').upsert({ user_id, step: 'delivery_date', message_id: deliveryDateMessage.result.message_id });
@@ -111,17 +116,54 @@ exports.handler = async function (event, ctx) {
 					})
 					.select()
 					.single();
+
+				let coefMessage = await editMessage(user_id, state.message_id, null, 'Выберите коээфициент', {
+					inline_keyboard: [
+						[{ callback_data: 0, text: 'Бесплатно' }],
+						[
+							{ callback_data: 1, text: 'х1' },
+							{ callback_data: 2, text: 'х2' },
+							{ callback_data: 3, text: 'х3' },
+						],
+						[
+							{ callback_data: 4, text: 'х4' },
+							{ callback_data: 5, text: 'х5' },
+							{ callback_data: 6, text: 'х6' },
+						],
+						[
+							{ callback_data: 7, text: 'х7' },
+							{ callback_data: 8, text: 'х8' },
+							{ callback_data: 9, text: 'х9' },
+						],
+						[{ callback_data: 10, text: 'х10' }],
+					],
+				});
+				await client.from('states').upsert({ user_id, step: 'coef', message_id: coefMessage.result.message_id });
+			}
+
+			if (state.step === 'coef') {
+				const { data: request, error } = await client
+					.from('requests')
+					.upsert({
+						id: state.req_id,
+						user_id,
+						is_active: true,
+						coef: callback_query.data,
+					})
+					.select()
+					.single();
 				let resultMessage = await editMessage(
 					user_id,
 					state.message_id,
 					null,
-					`Ваш запрос принят\n<b>Выбранный склад:</b> ${request.wh_id}\n<b>Дата поставки:</b> ${request.delivery_date}\n<b>Тип поставки:</b> ${request.delivery_type}`
+					`Ваш запрос принят\n<b>Выбранный склад:</b> ${request.wh_id}\n<b>Дата поставки:</b> ${request.delivery_date}\n<b>Тип поставки:</b> ${request.delivery_type}\n<b>Требуемый коэффициент:</b>${request.coef}`
 				);
 				await client.from('states').upsert({ user_id, step: 'result', message_id: resultMessage.result.message_id });
 			}
 		}
 
 		if (message) {
+			console.log('message ', message);
 			const { chat, text, from } = message;
 			const { data: user } = await client.from('users').select('*').eq('id', chat.id).single();
 
@@ -136,6 +178,10 @@ exports.handler = async function (event, ctx) {
 							[
 								{ callback_data: `207803`, text: 'СЦ Смоленск 2' },
 								{ callback_data: `205104`, text: 'СЦ Ульяновск' },
+							],
+							[
+								{ callback_data: '206348', text: 'Тула' },
+								{ callback_data: '117501', text: 'Подольск' },
 							],
 						],
 					});
@@ -158,6 +204,8 @@ exports.handler = async function (event, ctx) {
 
 			if (text === '/start') {
 				const { data: user, error } = await client.from('users').upsert(chat).select().single();
+				console.log('user: ', user);
+				console.log('error: ', error);
 				if (user) {
 					await sendMessage(chat.id, `Привет ${user.username}`);
 				}
@@ -174,37 +222,33 @@ exports.handler = async function (event, ctx) {
 			// }
 
 			if (text == '/test') {
-				const supabase = await client;
+				const { data, error } = await client
+					.from('requests')
+					.select('*')
+					.eq('is_active', true)
+					.filter('delivery_date', 'gte', new Date().toISOString().split('T')[0]);
+				console.log('data ', data);
+				console.log('error ', error);
 
-				console.log(
-					'warehouse ',
-					warehouse.map((i, n) => {
-						if (n < 10) {
-							return [{ text: i[0].title, callback_data: i[0].id, n }];
-						} else {
-							return;
-						}
-					})
-				);
-				await sendMessage(chat.id, 'Привет', {
-					inline_keyboard: warehouse.map((i, n) => {
-						if (n < 10) {
-							return [{ text: i[0].title, callback_data: i[0].id }];
-						}
-					}),
-					// [
-					// 	[
-					// 		{ callback_data: 211644, text: 'СЦ Екатеринбург 2 (Альпинистов)' },
-					// 		{ callback_data: 144154, text: 'СЦ Симферополь' },
-					// 	],
-					// 	[
-					// 		{ text: 'Кнопка', callback_data: 'id123' },
-					// 		{ text: 'Кнопка5', callback_data: 'id12345' },
-					// 	],
-					// 	[{ text: 'Кнопка2', callback_data: 'id1234' }],
-					// 	[{ text: 'Кнопка2', callback_data: 'id1234' }],
-					// ],
-				});
+				// await sendMessage(chat.id, 'Привет', {
+				// 	inline_keyboard: warehouse.map((i, n) => {
+				// 		if (n < 10) {
+				// 			return [{ text: i[0].title, callback_data: i[0].id }];
+				// 		}
+				// 	}),
+				// [
+				// 	[
+				// 		{ callback_data: 211644, text: 'СЦ Екатеринбург 2 (Альпинистов)' },
+				// 		{ callback_data: 144154, text: 'СЦ Симферополь' },
+				// 	],
+				// 	[
+				// 		{ text: 'Кнопка', callback_data: 'id123' },
+				// 		{ text: 'Кнопка5', callback_data: 'id12345' },
+				// 	],
+				// 	[{ text: 'Кнопка2', callback_data: 'id1234' }],
+				// 	[{ text: 'Кнопка2', callback_data: 'id1234' }],
+				// ],
+				// });
 				// console.log(text);
 				return { statusCode: 200, body: JSON.stringify({ message: 'Ok' }) };
 			}

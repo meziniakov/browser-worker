@@ -7,7 +7,11 @@ export default async (req) => {
 	process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0;
 	// let test = await sendMessage(305905070, `Пробное сообщение`);
 
-	const { data, error } = await client.from('requests').select('*').eq('is_active', true);
+	const { data, error } = await client
+		.from('requests')
+		.select('*')
+		.eq('is_active', true)
+		.filter('delivery_date', 'gte', new Date().toISOString().split('T')[0]);
 
 	if (data) {
 		data.forEach(async (req) => {
@@ -27,10 +31,10 @@ export default async (req) => {
 				}),
 			});
 			const fetchKoef = await response.json();
-			if (fetchKoef?.coef == 0) {
+			if (fetchKoef?.coef == req.coef) {
 				await client.from('requests').update({ is_active: false }).eq('id', req.id);
+				let send = await sendMessage(req.user_id, `Коээфициент по складу ${req.wh_id} сейчас: ${fetchKoef.coef}`);
 			}
-			let send = await sendMessage(req.user_id, `Коээфициент по складу ${req.wh_id} сейчас: ${fetchKoef.coef}`);
 			setTimeout(() => {}, 5000);
 		});
 	}
