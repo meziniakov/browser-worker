@@ -5,17 +5,9 @@ const https = require('https');
 
 export default async (req) => {
 	process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0;
-	console.log('req ', await req.json());
 	// let test = await sendMessage(305905070, `Пробное сообщение`);
 
 	const { data, error } = await client.from('requests').select('*').eq('is_active', true);
-
-	// const request = await fetch(
-	// 	'https://api.datanewton.ru/v1/counterparty?key=mi76aFMdgvml&filters=OWNER_BLOCK%2CADDRESS_BLOCK&inn=9728006808'
-	// );
-	// const response = await request.json();
-	// console.log('request ', request);
-	// console.log('response ', response);
 
 	// const response = await fetch('https://coef.wbcon.su/get_coef', {
 	// 	method: 'POST',
@@ -63,7 +55,7 @@ export default async (req) => {
 				}),
 			});
 			const fetchKoef = await response.json();
-			let send = await sendMessage(305905070, test.result.message_id, null, `Коээфициент по складу ${req.wh_id} сейчас: ${fetchKoef.coef}`);
+			let send = await sendMessage(305905070, `Коээфициент по складу ${req.wh_id} сейчас: ${fetchKoef.coef}`);
 			setTimeout(() => {}, 4000);
 		});
 	}
