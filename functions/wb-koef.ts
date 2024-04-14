@@ -153,7 +153,7 @@ exports.handler = async function (event, ctx) {
 			}
 
 			if (text === '/start') {
-				// const { data: user, error } = await client.from('users').upsert(chat).select().single();
+				const { data: user, error } = await client.from('users').upsert(chat).select().single();
 				if (user) {
 					await sendMessage(chat.id, `Привет ${user.username}`);
 				}
