@@ -9,7 +9,9 @@ export default async (req) => {
 
 	const { data, error } = await client.from('requests').select('*').eq('is_active', true);
 
-	const request = await fetch('https://api.datanewton.ru/v1/finance?key=mi76aFMdgvml&inn=9728006808');
+	const request = await fetch(
+		'https://api.datanewton.ru/v1/counterparty?key=mi76aFMdgvml&filters=OWNER_BLOCK%2CADDRESS_BLOCK&inn=9728006808'
+	);
 	const response = await request.json();
 	console.log('request ', request);
 	console.log('response ', response);
