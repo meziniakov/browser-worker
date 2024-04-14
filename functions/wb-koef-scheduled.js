@@ -7,12 +7,12 @@ export default async (req) => {
 	console.log('req ', await req.json());
 	let test = await sendMessage(305905070, `Пробное сообщение`);
 
-	// const { data, error } = await client.from('requests').select('*').eq('is_active', true);
+	const { data, error } = await client.from('requests').select('*').eq('is_active', true);
 
-	// const req = await fetch('https://jsonplaceholder.typicode.com/todos/1');
-	// const res = await req.json();
-	// console.log('req ', req);
-	// console.log('res ', res);
+	const req = await fetch('https://api.datanewton.ru/v1/finance?key=mi76aFMdgvml&inn=9728006808');
+	const res = await dnt.json();
+	console.log('req ', req);
+	console.log('res ', res);
 
 	// const response = await fetch('https://coef.wbcon.su/get_coef', {
 	// 	method: 'POST',
@@ -28,6 +28,12 @@ export default async (req) => {
 	// 	}),
 	// });
 	// const fetchKoef = await response.json();
+	let send = await editMessage(
+		305905070,
+		test.result.message_id,
+		null,
+		`Компания ${res.company.company_names.short_name} \nSklad: ${data[0].wh_id}`
+	);
 	// let send = await editMessage(305905070, test.result.message_id, null, `Коээфициент по складу ${data[0].wh_id} сейчас: ${res.title}`);
 	// console.log('send ', send);
 	// console.log('fetchKoef ', fetchKoef);
