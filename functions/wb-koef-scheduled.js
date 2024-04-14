@@ -8,6 +8,7 @@ export default async (req) => {
 
 	const response = await fetch('https://coef.wbcon.su/get_coef', {
 		method: 'POST',
+		rejectUnauthorized: false,
 		headers: {
 			'Content-Type': 'application/json',
 		},
