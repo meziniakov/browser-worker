@@ -9,10 +9,10 @@ export default async (req) => {
 
 	const { data, error } = await client.from('requests').select('*').eq('is_active', true);
 
-	const req = await fetch('https://api.datanewton.ru/v1/finance?key=mi76aFMdgvml&inn=9728006808');
-	const res = await dnt.json();
-	console.log('req ', req);
-	console.log('res ', res);
+	const request = await fetch('https://api.datanewton.ru/v1/finance?key=mi76aFMdgvml&inn=9728006808');
+	const response = await request.json();
+	console.log('request ', request);
+	console.log('response ', response);
 
 	// const response = await fetch('https://coef.wbcon.su/get_coef', {
 	// 	method: 'POST',
@@ -32,7 +32,7 @@ export default async (req) => {
 		305905070,
 		test.result.message_id,
 		null,
-		`Компания ${res.company.company_names.short_name} \nSklad: ${data[0].wh_id}`
+		`Компания ${response.company.company_names.short_name} \nSklad: ${data[0].wh_id}`
 	);
 	// let send = await editMessage(305905070, test.result.message_id, null, `Коээфициент по складу ${data[0].wh_id} сейчас: ${res.title}`);
 	// console.log('send ', send);
