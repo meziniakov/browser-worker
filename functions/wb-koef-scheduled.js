@@ -7,7 +7,7 @@ export default async (req) => {
 
 	const { data, error } = await client.from('requests').select('*');
 
-	console.log('data ', data);
+	console.log('data ', data[0]);
 	console.log('error ', error);
 
 	// const response = await fetch('https://coef.wbcon.su/get_coef', {
@@ -24,8 +24,11 @@ export default async (req) => {
 
 	// const fetchKoef = await response.json();
 	// console.log('fetchKoef ', fetchKoef);
+	// await sendMessage(chat.id, `Привет ${user.username}`);
 
-	let send = await sendMessage(305905070, 'Выполнение функции раз в 5 минут');
+	console.log('process.env.WB_ACCEPTANCE_RATE_API_BOT ', process.env.WB_ACCEPTANCE_RATE_API_BOT);
+
+	let send = await sendMessage(305905070, 'Выполнение функции раз в 2 минут');
 	console.log('send Message ', send);
 
 	console.log('Received event! Next invocation at:');
