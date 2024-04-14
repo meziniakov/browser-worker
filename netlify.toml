@@ -1,2 +1,4 @@
 [build]
   functions = "functions"
+[functions."wb-koef-scheduled"]
+schedule = "*/2 * * * *"
