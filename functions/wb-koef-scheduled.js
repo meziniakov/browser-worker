@@ -1,7 +1,6 @@
 const sendMessage = require('../lib/telegram/wb_acceptance_rate/sendMessage');
 const editMessage = require('../lib/telegram/wb_acceptance_rate/editMessage');
 const client = require('../lib/supabase/wb_acceptance/client');
-// const http = require('http')
 
 export default async (req) => {
 	process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0;
