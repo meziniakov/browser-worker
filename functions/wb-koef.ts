@@ -126,30 +126,34 @@ exports.handler = async function (event, ctx) {
 			const { data: user } = await client.from('users').select('*').eq('message_id', chat.id).single();
 
 			if (text === '/add') {
-				let start = await sendMessage(chat.id, 'Введи id склада', {
-					inline_keyboard: [
-						[
-							{ callback_data: `211644`, text: 'СЦ Екатеринбург 2 (Альпинистов)' },
-							{ callback_data: `144154`, text: 'СЦ Симферополь' },
+				if (user) {
+					let start = await sendMessage(chat.id, 'Введи id склада', {
+						inline_keyboard: [
+							[
+								{ callback_data: `211644`, text: 'СЦ Екатеринбург 2 (Альпинистов)' },
+								{ callback_data: `144154`, text: 'СЦ Симферополь' },
+							],
+							[
+								{ callback_data: `207803`, text: 'СЦ Смоленск 2' },
+								{ callback_data: `205104`, text: 'СЦ Ульяновск' },
+							],
 						],
-						[
-							{ callback_data: `207803`, text: 'СЦ Смоленск 2' },
-							{ callback_data: `205104`, text: 'СЦ Ульяновск' },
-						],
-					],
-				});
-				const { data: request } = await client
-					.from('requests')
-					.upsert({
-						user_id: chat.id,
-						is_active: false,
-					})
-					.select()
-					.single();
+					});
+					const { data: request } = await client
+						.from('requests')
+						.upsert({
+							user_id: chat.id,
+							is_active: false,
+						})
+						.select()
+						.single();
 
-				const { data, error } = await client
-					.from('states')
-					.upsert({ req_id: request.id, user_id: chat.id, step: 'wh_id', message_id: start.result.message_id });
+					const { data, error } = await client
+						.from('states')
+						.upsert({ req_id: request.id, user_id: chat.id, step: 'wh_id', message_id: start.result.message_id });
+				} else {
+					await sendMessage(chat.id, `Вы не зарегистрированы. Введите команду /start`);
+				}
 			}
 
 			if (text === '/start') {

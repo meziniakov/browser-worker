@@ -27,7 +27,10 @@ export default async (req) => {
 				}),
 			});
 			const fetchKoef = await response.json();
-			let send = await sendMessage(305905070, `Коээфициент по складу ${req.wh_id} сейчас: ${fetchKoef.coef}`);
+			if (fetchKoef?.coef == 0) {
+				await client.from('requests').update({ is_active: false }).eq('id', req.id);
+			}
+			let send = await sendMessage(req.user_id, `Коээфициент по складу ${req.wh_id} сейчас: ${fetchKoef.coef}`);
 			setTimeout(() => {}, 5000);
 		});
 	}
