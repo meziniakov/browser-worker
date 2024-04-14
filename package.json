@@ -8,6 +8,7 @@
 		"start": "wrangler dev"
 	},
 	"dependencies": {
+		"@netlify/functions": "^2.6.0",
 		"@supabase/supabase-js": "^2.39.3",
 		"dotenv": "^16.3.1"
 	}
