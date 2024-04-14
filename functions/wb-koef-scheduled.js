@@ -13,13 +13,13 @@ export default async (req) => {
 			'Content-Type': 'application/json',
 		},
 		body: JSON.stringify({
-			wh_id: req.wh_id,
-			delivery_date: req.delivery_date,
-			delivery_type: req.delivery_type,
+			wh_id: data[0].wh_id,
+			delivery_date: data[0].delivery_date,
+			delivery_type: data[0].delivery_type,
 		}),
 	});
 	const fetchKoef = await response.json();
-	let send = await sendMessage(305905070, `Коээфициент по складу ${req.wh_id} сейчас: ${fetchKoef.coef}`);
+	let send = await sendMessage(305905070, `Коээфициент по складу ${data.wh_id} сейчас: ${fetchKoef.coef}`);
 	console.log('fetchKoef ', fetchKoef);
 	console.log('send ', send);
 
