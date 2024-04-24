@@ -35,7 +35,7 @@ export default async (req) => {
 					}),
 				});
 				const fetchKoef = await response.json();
-				if (fetchKoef?.coef == req.coef) {
+				if (fetchKoef?.coef <= req.coef) {
 					await client.from('requests').update({ is_active: false }).eq('id', req.id);
 					await sendMessage(
 						chat.id,
