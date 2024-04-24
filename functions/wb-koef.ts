@@ -9,7 +9,7 @@ interface CallBackQuery {
 	message?: any; //MaybeInaccessibleMessage;
 	inline_message_id?: string;
 	chat_instance?: string;
-	data?: string;
+	data?: string | undefined;
 	game_short_name: string;
 }
 
@@ -29,6 +29,8 @@ type User = {
 };
 
 exports.handler = async function (event, ctx) {
+	const aboutBot = `🙌 WB Acceptance Bot - это твой помощник по поиску слотов поставок на складах Wildberries.\n\nВы сами выбираете нужный склад > дату поставки > тип поставки и приемлемый уровень коэффициента (или только бесплатные поставки).\n\nWB Acceptance Bot оповестит вас сразу, как только заданные вами условия выполнятся!\n\n🚀 Добавьте новый запрос командой /add`;
+
 	try {
 		const {
 			message,
@@ -54,151 +56,174 @@ exports.handler = async function (event, ctx) {
 
 		//обработка callback кнопок
 		if (callback_query) {
-			let user_id = callback_query.from.id;
-			const { data: state, error: er } = await client.from('states').select('*').eq('user_id', user_id).single();
+			console.log('callback_query ', callback_query);
+			let { message } = callback_query;
+			let { chat, from } = message;
+			let user_id = chat.id;
 
-			if (state.step === 'wh_id') {
-				const { data, error } = await client
-					.from('requests')
-					.upsert({
-						id: state.req_id,
-						user_id,
-						is_active: false,
-						wh_id: callback_query.data,
-					})
-					.select()
-					.single();
+			if (callback_query?.data) {
+				let { start, wh_id, delivery_type, delivery_date, coef } = JSON.parse(callback_query?.data);
+				let pageSize = 10;
 
-				let deliveryTypeMessage = await editMessage(user_id, state.message_id, null, 'Введите тип поставки', {
-					inline_keyboard: [
-						[{ callback_data: 'mono_pallet', text: 'Моно-палеты' }],
-						[{ callback_data: 'koroba', text: 'Короба' }],
-						[{ callback_data: 'super_safe', text: 'Супер-сейф' }],
-					],
-				});
-				await client.from('states').upsert({ user_id, step: 'delivery_type', message_id: deliveryTypeMessage.result.message_id });
-			}
+				if (start >= 0) {
+					const { data, error } = await client
+						.from('warehouses')
+						.select('*')
+						.limit(10)
+						.order('title')
+						.range(start, start + pageSize);
 
-			if (state.step === 'delivery_type') {
-				const { data, error } = await client
-					.from('requests')
-					.upsert({
-						id: state.req_id,
-						user_id,
-						is_active: false,
-						delivery_type: callback_query.data,
-					})
-					.select()
-					.single();
+					//если массив складов > 0
+					if (data.length > 0) {
+						let warehouses = data.map((warehouse) => [{ text: warehouse.title, callback_data: JSON.stringify({ wh_id: warehouse.id }) }]);
 
-				let today = new Date();
-				let week = today.setDate(today.getDate() + 7);
-				let tomorrow = today.setDate(today.getDate() + 1);
+						//если начало списка складов - оставляем стрелку вперед
+						if (start == 0) {
+							warehouses.push([{ text: '→', callback_data: JSON.stringify({ start: start + pageSize }) }]);
+						} else {
+							//если конец списка складов (в массиве меньше 10) - оставляем стрелку назад
+							data.length < pageSize - 1
+								? warehouses.push([{ text: '←', callback_data: JSON.stringify({ start: start - pageSize }) }])
+								: warehouses.push([
+										{ text: '←', callback_data: JSON.stringify({ start: start - pageSize }) },
+										{ text: '→', callback_data: JSON.stringify({ start: start + pageSize }) },
+								  ]);
+						}
+						await editMessage(chat.id, message.message_id, null, 'Выберите склад', {
+							inline_keyboard: warehouses,
+						});
+					}
+				} else if (start <= 0) {
+					//TODO: если вдруг начало списка складов меньше 0 - ничего не делаем
+				}
 
-				let deliveryDateMessage = await editMessage(user_id, state.message_id, null, 'Введите дату', {
-					inline_keyboard: [
-						[{ callback_data: new Date().toISOString().split('T')[0], text: 'Сегодня' }],
-						[{ callback_data: new Date(tomorrow).toISOString().split('T')[0], text: 'Завтра' }],
-						[{ callback_data: new Date(week).toISOString().split('T')[0], text: 'Неделя' }],
-					],
-				});
-				await client.from('states').upsert({ user_id, step: 'delivery_date', message_id: deliveryDateMessage.result.message_id });
-			}
-
-			if (state.step === 'delivery_date') {
-				const { data: request, error } = await client
-					.from('requests')
-					.upsert({
-						id: state.req_id,
-						user_id,
-						is_active: true,
-						delivery_date: callback_query.data,
-					})
-					.select()
-					.single();
-
-				let coefMessage = await editMessage(user_id, state.message_id, null, 'Выберите коээфициент', {
-					inline_keyboard: [
-						[{ callback_data: 0, text: 'Бесплатно' }],
-						[
-							{ callback_data: 1, text: 'х1' },
-							{ callback_data: 2, text: 'х2' },
-							{ callback_data: 3, text: 'х3' },
+				if (wh_id) {
+					await editMessage(chat.id, message.message_id, null, 'Введите тип поставки', {
+						inline_keyboard: [
+							[{ callback_data: JSON.stringify({ delivery_type: 'mono_pallet' }), text: 'Моно-палеты' }],
+							[{ callback_data: JSON.stringify({ delivery_type: 'koroba' }), text: 'Короба' }],
+							[{ callback_data: JSON.stringify({ delivery_type: 'super_safe' }), text: 'Супер-сейф' }],
 						],
-						[
-							{ callback_data: 4, text: 'х4' },
-							{ callback_data: 5, text: 'х5' },
-							{ callback_data: 6, text: 'х6' },
-						],
-						[
-							{ callback_data: 7, text: 'х7' },
-							{ callback_data: 8, text: 'х8' },
-							{ callback_data: 9, text: 'х9' },
-						],
-						[{ callback_data: 10, text: 'х10' }],
-					],
-				});
-				await client.from('states').upsert({ user_id, step: 'coef', message_id: coefMessage.result.message_id });
-			}
+					});
 
-			if (state.step === 'coef') {
-				const { data: request, error } = await client
-					.from('requests')
-					.upsert({
-						id: state.req_id,
+					const { data: states, error } = await client.from('states').upsert({ user_id, step: 'wh_id', wh_id });
+					console.log('states ', states);
+					console.log('error ', error);
+				}
+
+				if (delivery_type) {
+					let today = new Date();
+					let week = today.setDate(today.getDate() + 7);
+					let tomorrow = today.setDate(today.getDate() + 1);
+
+					await editMessage(chat.id, message.message_id, null, 'Выберите дату', {
+						inline_keyboard: [
+							[{ callback_data: JSON.stringify({ delivery_date: new Date().toISOString().split('T')[0] }), text: 'Сегодня' }],
+							[{ callback_data: JSON.stringify({ delivery_date: new Date(tomorrow).toISOString().split('T')[0] }), text: 'Завтра' }],
+							[{ callback_data: JSON.stringify({ delivery_date: new Date(week).toISOString().split('T')[0] }), text: 'Неделя' }],
+						],
+					});
+					await client.from('states').upsert({ user_id, step: 'delivery_type', delivery_type });
+				}
+
+				if (delivery_date) {
+					await editMessage(chat.id, message.message_id, null, 'Выберите коээфициент', {
+						inline_keyboard: [
+							[{ callback_data: JSON.stringify({ coef: 0 }), text: 'Бесплатно' }],
+							[
+								{ callback_data: JSON.stringify({ coef: 1 }), text: 'х1 и менее' },
+								{ callback_data: JSON.stringify({ coef: 2 }), text: 'х2 и менее' },
+								{ callback_data: JSON.stringify({ coef: 3 }), text: 'х3 и менее' },
+							],
+							[
+								{ callback_data: JSON.stringify({ coef: 4 }), text: 'х4 и менее' },
+								{ callback_data: JSON.stringify({ coef: 5 }), text: 'х5 и менее' },
+								{ callback_data: JSON.stringify({ coef: 6 }), text: 'х6 и менее' },
+							],
+							[
+								{ callback_data: JSON.stringify({ coef: 7 }), text: 'х7 и менее' },
+								{ callback_data: JSON.stringify({ coef: 8 }), text: 'х8 и менее' },
+								{ callback_data: JSON.stringify({ coef: 9 }), text: 'х9 и менее' },
+							],
+							[{ callback_data: JSON.stringify({ coef: 10 }), text: 'х10 и менее' }],
+						],
+					});
+
+					await client.from('states').upsert({ user_id, step: 'delivery_date', delivery_date });
+				}
+
+				if (coef) {
+					const {
+						data: { wh_id, delivery_date, delivery_type },
+					} = await client.from('states').select('*').eq('user_id', user_id).single();
+
+					const { data: request, error } = await client
+						.from('requests')
+						.insert({
+							user_id,
+							is_active: true,
+							wh_id,
+							delivery_date,
+							delivery_type,
+							coef,
+						})
+						.select('*, warehouses (id, title)')
+						.single();
+
+					await editMessage(
 						user_id,
-						is_active: true,
-						coef: callback_query.data,
-					})
-					.select()
-					.single();
-				let resultMessage = await editMessage(
-					user_id,
-					state.message_id,
-					null,
-					`Ваш запрос принят\n<b>Выбранный склад:</b> ${request.wh_id}\n<b>Дата поставки:</b> ${request.delivery_date}\n<b>Тип поставки:</b> ${request.delivery_type}\n<b>Требуемый коэффициент:</b>${request.coef}`
-				);
-				await client.from('states').upsert({ user_id, step: 'result', message_id: resultMessage.result.message_id });
+						message.message_id,
+						null,
+						`Ваш запрос принят\n<b>Выбранный склад: </b>${request.warehouses.title} (${request.wh_id})\n<b>Дата поставки: </b> ${request.delivery_date}\n<b>Тип поставки: </b> ${request.delivery_type}\n<b>Требуемый коэффициент: </b>${coef}`
+					);
+
+					await client.from('states').update({ step: null }).eq('user_id', user_id).select();
+				}
 			}
 		}
 
 		if (message) {
-			console.log('message ', message);
+			// console.log('message ', message);
 			const { chat, text, from } = message;
 			const { data: user } = await client.from('users').select('*').eq('id', chat.id).single();
 
 			if (text === '/add') {
 				if (user) {
-					let start = await sendMessage(chat.id, 'Введи id склада', {
-						inline_keyboard: [
-							[
-								{ callback_data: `211644`, text: 'СЦ Екатеринбург 2 (Альпинистов)' },
-								{ callback_data: `144154`, text: 'СЦ Симферополь' },
-							],
-							[
-								{ callback_data: `207803`, text: 'СЦ Смоленск 2' },
-								{ callback_data: `205104`, text: 'СЦ Ульяновск' },
-							],
-							[
-								{ callback_data: '206348', text: 'Тула' },
-								{ callback_data: '117501', text: 'Подольск' },
-							],
-						],
-					});
-					const { data: request } = await client
-						.from('requests')
-						.upsert({
-							user_id: chat.id,
-							is_active: false,
-						})
-						.select()
-						.single();
+					const { data, error } = await client.from('warehouses').select('*').limit(10).order('title').range(0, 10);
 
-					const { data, error } = await client
-						.from('states')
-						.upsert({ req_id: request.id, user_id: chat.id, step: 'wh_id', message_id: start.result.message_id });
+					let warehouses = data.map((warehouse) => [{ text: warehouse.title, callback_data: JSON.stringify({ wh_id: warehouse.id }) }]);
+					warehouses.push([{ text: '→', callback_data: JSON.stringify({ start: 10 }) }]);
+
+					await sendMessage(chat.id, 'Выберите склад', {
+						inline_keyboard: warehouses,
+					});
 				} else {
 					await sendMessage(chat.id, `Вы не зарегистрированы. Введите команду /start`);
+				}
+			}
+
+			if (text === '/test') {
+				// console.log('expiredRequests', expiredRequests);
+			}
+
+			if (text === '/mylimits') {
+				const { data: requests, error } = await client
+					.from('requests')
+					.select('*, warehouses (title), coefficients (title), delivery_types (title)')
+					.eq('is_active', true)
+					.eq('user_id', chat.id);
+
+				let result = requests.map(
+					(i, n) =>
+						`🟢 ${n + 1}. › ${i.warehouses.title} › ${i.delivery_types.title} › ${i.coefficients.title} › ${new Date(
+							i.delivery_date
+						).toLocaleDateString()}\n`
+				);
+
+				if (requests.length > 0) {
+					await sendMessage(chat.id, `🔎 Мои запросы (активные)\n${result.join('\n')}`);
+				} else {
+					await sendMessage(chat.id, 'У вас пока нет ни одного запроса. Отправьте команду /add для добавления нового запроса');
 				}
 			}
 
@@ -207,50 +232,9 @@ exports.handler = async function (event, ctx) {
 				console.log('user: ', user);
 				console.log('error: ', error);
 				if (user) {
-					await sendMessage(chat.id, `Привет ${user.username}`);
+					await sendMessage(chat.id, aboutBot);
+					await sendMessage(305905070, `Новая регистрация бота:\n${user.id}\n${user.username}\n${user.first_name}\n${user.last_name}`);
 				}
-			}
-
-			// if (request?.wh_id == 'null') {
-			// 	console.log('request.wh_id ', request.wh_id);
-			// 	const { data, error } = await client.from('requests').update({ wh_id: text }).select().single();
-			// 	if (data) {
-			// 		await sendMessage(chat.id, 'Введите дату');
-			// 	} else {
-			// 		await sendMessage(chat.id, 'id не соответствует складу');
-			// 	}
-			// }
-
-			if (text == '/test') {
-				const { data, error } = await client
-					.from('requests')
-					.select('*')
-					.eq('is_active', true)
-					.filter('delivery_date', 'gte', new Date().toISOString().split('T')[0]);
-				console.log('data ', data);
-				console.log('error ', error);
-
-				// await sendMessage(chat.id, 'Привет', {
-				// 	inline_keyboard: warehouse.map((i, n) => {
-				// 		if (n < 10) {
-				// 			return [{ text: i[0].title, callback_data: i[0].id }];
-				// 		}
-				// 	}),
-				// [
-				// 	[
-				// 		{ callback_data: 211644, text: 'СЦ Екатеринбург 2 (Альпинистов)' },
-				// 		{ callback_data: 144154, text: 'СЦ Симферополь' },
-				// 	],
-				// 	[
-				// 		{ text: 'Кнопка', callback_data: 'id123' },
-				// 		{ text: 'Кнопка5', callback_data: 'id12345' },
-				// 	],
-				// 	[{ text: 'Кнопка2', callback_data: 'id1234' }],
-				// 	[{ text: 'Кнопка2', callback_data: 'id1234' }],
-				// ],
-				// });
-				// console.log(text);
-				return { statusCode: 200, body: JSON.stringify({ message: 'Ok' }) };
 			}
 		}
 

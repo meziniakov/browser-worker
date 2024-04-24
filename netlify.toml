@@ -2,3 +2,6 @@
   functions = "functions"
 [functions."wb-koef-scheduled"]
 schedule = "0,30 * * * *"
+
+[functions."wb-koef-expired-scheduled"]
+schedule = "2 0 * * *"
