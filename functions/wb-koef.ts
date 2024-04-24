@@ -181,7 +181,7 @@ exports.handler = async function (event, ctx) {
 						null,
 						`Ваш запрос принят\n<b>Выбранный склад: </b>${request.warehouses?.title} (${request.wh_id})\n<b>Дата поставки: </b> ${new Date(
 							request.delivery_date
-						).toLocaleDateString()}\n<b>Тип поставки: </b> ${request.delivery_types.title}\n<b>Требуемый коэффициент: </b>${
+						).toLocaleDateString('ru-RU')}\n<b>Тип поставки: </b> ${request.delivery_types.title}\n<b>Требуемый коэффициент: </b>${
 							request.coef
 						} (${request.coefficients.title})`
 					);
