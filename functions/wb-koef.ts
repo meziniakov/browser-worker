@@ -112,15 +112,15 @@ exports.handler = async function (event, ctx) {
 				}
 
 				if (delivery_type) {
-					let today = new Date();
-					let week = today.setDate(today.getDate() + 7);
-					let tomorrow = today.setDate(today.getDate() + 1);
+					let today = new Date().toISOString().split('T')[0];
+					let tomorrow = new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0];
+					let week = new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0];
 
 					await editMessage(chat.id, message.message_id, null, 'Выберите дату', {
 						inline_keyboard: [
-							[{ callback_data: JSON.stringify({ delivery_date: new Date().toISOString().split('T')[0] }), text: 'Сегодня' }],
-							[{ callback_data: JSON.stringify({ delivery_date: new Date(tomorrow).toISOString().split('T')[0] }), text: 'Завтра' }],
-							[{ callback_data: JSON.stringify({ delivery_date: new Date(week).toISOString().split('T')[0] }), text: 'Неделя' }],
+							[{ callback_data: JSON.stringify({ delivery_date: today }), text: 'Сегодня' }],
+							[{ callback_data: JSON.stringify({ delivery_date: tomorrow }), text: 'Завтра' }],
+							[{ callback_data: JSON.stringify({ delivery_date: week }), text: 'В течение недели' }],
 						],
 					});
 					await client.from('states').upsert({ user_id, step: 'delivery_type', delivery_type });
@@ -149,10 +149,12 @@ exports.handler = async function (event, ctx) {
 						],
 					});
 
-					await client.from('states').upsert({ user_id, step: 'delivery_date', delivery_date });
+					const { data, error } = await client.from('states').upsert({ user_id, step: 'delivery_date', delivery_date }).select('*');
+					console.log('data delivery_date', data);
+					console.log('error delivery_date', error);
 				}
 
-				if (coef) {
+				if (coef >= 0) {
 					const {
 						data: { wh_id, delivery_date, delivery_type },
 					} = await client.from('states').select('*').eq('user_id', user_id).single();
@@ -167,17 +169,26 @@ exports.handler = async function (event, ctx) {
 							delivery_type,
 							coef,
 						})
-						.select('*, warehouses (id, title)')
+						.select('*, warehouses (id, title), coefficients (title), delivery_types (title)')
 						.single();
+
+					console.log('request', request);
+					console.log('error', error);
 
 					await editMessage(
 						user_id,
 						message.message_id,
 						null,
-						`Ваш запрос принят\n<b>Выбранный склад: </b>${request.warehouses.title} (${request.wh_id})\n<b>Дата поставки: </b> ${request.delivery_date}\n<b>Тип поставки: </b> ${request.delivery_type}\n<b>Требуемый коэффициент: </b>${coef}`
+						`Ваш запрос принят\n<b>Выбранный склад: </b>${request.warehouses?.title} (${request.wh_id})\n<b>Дата поставки: </b> ${new Date(
+							request.delivery_date
+						).toLocaleDateString()}\n<b>Тип поставки: </b> ${request.delivery_types.title}\n<b>Требуемый коэффициент: </b>${
+							request.coef
+						} (${request.coefficients.title})`
 					);
 
-					await client.from('states').update({ step: null }).eq('user_id', user_id).select();
+					const { data, error: err } = await client.from('states').update({ step: null }).eq('user_id', user_id).select();
+					console.log('data coef', data);
+					console.log('error coef', err);
 				}
 			}
 		}
