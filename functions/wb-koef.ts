@@ -62,7 +62,7 @@ exports.handler = async function (event, ctx) {
 			let user_id = chat.id;
 
 			if (callback_query?.data) {
-				let { start, wh_id, delivery_type, delivery_date, coef } = JSON.parse(callback_query?.data);
+				let { start, wh_id, delivery_type, delivery_date, delivery_date_title, coef } = JSON.parse(callback_query?.data);
 				let pageSize = 10;
 
 				if (start >= 0) {
@@ -118,9 +118,9 @@ exports.handler = async function (event, ctx) {
 
 					await editMessage(chat.id, message.message_id, null, 'Выберите дату', {
 						inline_keyboard: [
-							[{ callback_data: JSON.stringify({ delivery_date: today }), text: 'Сегодня' }],
-							[{ callback_data: JSON.stringify({ delivery_date: tomorrow }), text: 'Завтра' }],
-							[{ callback_data: JSON.stringify({ delivery_date: week }), text: 'В течение недели' }],
+							[{ callback_data: JSON.stringify({ delivery_date_title: 'today', delivery_date: today }), text: 'Сегодня' }],
+							[{ callback_data: JSON.stringify({ delivery_date_title: 'tomorrow', delivery_date: tomorrow }), text: 'Завтра' }],
+							[{ callback_data: JSON.stringify({ delivery_date_title: 'week', delivery_date: week }), text: 'В течение недели' }],
 						],
 					});
 					await client.from('states').upsert({ user_id, step: 'delivery_type', delivery_type });
@@ -149,14 +149,25 @@ exports.handler = async function (event, ctx) {
 						],
 					});
 
-					const { data, error } = await client.from('states').upsert({ user_id, step: 'delivery_date', delivery_date }).select('*');
-					console.log('data delivery_date', data);
-					console.log('error delivery_date', error);
+					let today = new Date().toISOString().split('T')[0];
+
+					if (delivery_date_title == 'week') {
+						const { data, error } = await client
+							.from('states')
+							.upsert({ user_id, step: 'delivery_date', delivery_date, delivery_date_start: today })
+							.select('*');
+						console.log('data delivery_date', data);
+						console.log('error delivery_date', error);
+					} else {
+						const { data, error } = await client.from('states').upsert({ user_id, step: 'delivery_date', delivery_date }).select('*');
+						console.log('data delivery_date', data);
+						console.log('error delivery_date', error);
+					}
 				}
 
 				if (coef >= 0) {
 					const {
-						data: { wh_id, delivery_date, delivery_type },
+						data: { wh_id, delivery_date, delivery_type, delivery_date_start },
 					} = await client.from('states').select('*').eq('user_id', user_id).single();
 
 					const { data: request, error } = await client
@@ -167,6 +178,7 @@ exports.handler = async function (event, ctx) {
 							wh_id,
 							delivery_date,
 							delivery_type,
+							delivery_date_start,
 							coef,
 						})
 						.select('*, warehouses (id, title), coefficients (title), delivery_types (title)')
@@ -179,11 +191,11 @@ exports.handler = async function (event, ctx) {
 						user_id,
 						message.message_id,
 						null,
-						`Ваш запрос принят\n<b>Выбранный склад: </b>${request.warehouses?.title} (${request.wh_id})\n<b>Дата поставки: </b> ${new Date(
-							request.delivery_date
-						).toLocaleDateString('ru-RU')}\n<b>Тип поставки: </b> ${request.delivery_types.title}\n<b>Требуемый коэффициент: </b>${
-							request.coef
-						} (${request.coefficients.title})`
+						`Ваш запрос принят\n<b>Выбранный склад: </b>${request.warehouses?.title} (${request.wh_id})\n<b>Дата поставки: </b> ${
+							delivery_date_start ? new Date(delivery_date_start).toLocaleDateString('ru-RU') + ' - ' : ''
+						} ${new Date(request.delivery_date).toLocaleDateString('ru-RU')}\n<b>Тип поставки: </b> ${
+							request.delivery_types.title
+						}\n<b>Требуемый коэффициент: </b>${request.coef} (${request.coefficients.title})`
 					);
 
 					const { data, error: err } = await client.from('states').update({ step: null }).eq('user_id', user_id).select();
@@ -223,12 +235,13 @@ exports.handler = async function (event, ctx) {
 					.select('*, warehouses (title), coefficients (title), delivery_types (title)')
 					.eq('is_active', true)
 					.eq('user_id', chat.id);
+				console.log(requests);
 
 				let result = requests.map(
 					(i, n) =>
-						`🟢 ${n + 1}. › ${i.warehouses.title} › ${i.delivery_types.title} › ${i.coefficients.title} › ${new Date(
-							i.delivery_date
-						).toLocaleDateString()}\n`
+						`🟢 ${n + 1}. › ${i.warehouses.title} › ${i.delivery_types.title} › ${i.coefficients.title} › ${
+							i.delivery_date_start ? new Date(i.delivery_date_start).toLocaleDateString('ru-RU') + ' - ' : ''
+						} ${new Date(i.delivery_date).toLocaleDateString('ru-RU')}\n`
 				);
 
 				if (requests.length > 0) {
