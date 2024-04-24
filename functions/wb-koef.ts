@@ -226,7 +226,36 @@ exports.handler = async function (event, ctx) {
 			}
 
 			if (text === '/test') {
-				// console.log('expiredRequests', expiredRequests);
+				const { data, error } = await client
+					.from('requests')
+					.select('*, warehouses (title), coefficients (title), delivery_types (title)')
+					.eq('is_active', true)
+					.filter('delivery_date', 'gte', new Date().toISOString().split('T')[0]);
+				console.log('data', data);
+				console.log('error', error);
+
+				data.forEach(async (req, n) => {
+					let delivery_date = new Date(req.delivery_date).toISOString();
+					let delivery_date_start = new Date(req.delivery_date_start).toISOString();
+					let today = new Date().toISOString();
+
+					if (today <= delivery_date) {
+						await client.from('requests').update({ is_active: false }).eq('id', req.id);
+						// await sendMessage(
+						// 	chat.id,
+						// 	`Доступна приёмка:\n📦 › ${req.warehouses.title} › ${req.delivery_types.title} › ${req.coefficients.title} › ${
+						// 		req.delivery_date_start ? new Date(delivery_date_start).toLocaleDateString('ru-RU') + ' - ' : ''
+						// 	} ${new Date(delivery_date).toLocaleDateString('ru-RU')}\n`
+						// );
+						await sendMessage(
+							300366843,
+							`Доступна приёмка:\n📦 › ${req.warehouses.title} › ${req.delivery_types.title} › ${req.coefficients.title} › ${
+								req.delivery_date_start ? new Date(delivery_date_start).toLocaleDateString('ru-RU') + ' - ' : ''
+							} ${new Date(delivery_date).toLocaleDateString('ru-RU')}\n`
+						);
+					}
+					setTimeout(() => {}, 5000);
+				});
 			}
 
 			if (text === '/mylimits') {
