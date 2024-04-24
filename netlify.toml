@@ -1,7 +1,7 @@
 [build]
   functions = "functions"
 [functions."wb-koef-scheduled"]
-schedule = "0,5 * * * *"
+schedule = "*/5 * * * *"
 
 [functions."wb-koef-expired-scheduled"]
 schedule = "2 0 * * *"
