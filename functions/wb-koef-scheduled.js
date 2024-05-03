@@ -44,7 +44,7 @@ export default async (req) => {
 						).toLocaleDateString('ru-RU')}\n`
 					);
 				}
-				setTimeout(() => {}, 3000);
+				setTimeout(() => {}, 1000);
 			} catch (e) {
 				console.log('Error fetch: ', e);
 			}
