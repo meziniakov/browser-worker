@@ -15,7 +15,6 @@ export default async (req) => {
 	if (data) {
 		data.forEach(async (req, n) => {
 			let delivery_date = new Date(req.delivery_date).toISOString();
-			let delivery_date_start = new Date(req.delivery_date_start).toISOString();
 			let today = new Date().toISOString();
 
 			if (today <= delivery_date) {
@@ -35,22 +34,23 @@ export default async (req) => {
 					}),
 				});
 				const fetchKoef = await response.json();
+				console.log('fetchKoef ', fetchKoef);
 				if (fetchKoef?.coef <= req.coef) {
 					await client.from('requests').update({ is_active: false }).eq('id', req.id);
 					await sendMessage(
 						chat.id,
-						`Доступна приёмка:\n📦 › ${req.warehouses.title} › ${req.delivery_types.title} › ${req.coefficients.title} › ${
-							req.delivery_date_start ? new Date(delivery_date_start).toLocaleDateString('ru-RU') + ' - ' : ''
-						} ${new Date(delivery_date).toLocaleDateString('ru-RU')}\n`
+						`Доступна приёмка:\n📦 › ${req.warehouses.title} › ${req.delivery_types.title} › ${req.coefficients.title} › ${new Date(
+							delivery_date
+						).toLocaleDateString('ru-RU')}\n`
 					);
 					await sendMessage(
 						305905070,
-						`Доступна приёмка:\n📦 › ${req.warehouses.title} › ${req.delivery_types.title} › ${req.coefficients.title} › ${
-							req.delivery_date_start ? new Date(delivery_date_start).toLocaleDateString('ru-RU') + ' - ' : ''
-						} ${new Date(delivery_date).toLocaleDateString('ru-RU')}\n`
+						`Доступна приёмка:\n📦 › ${req.warehouses.title} › ${req.delivery_types.title} › ${req.coefficients.title} › ${new Date(
+							delivery_date
+						).toLocaleDateString('ru-RU')}\n`
 					);
 				}
-				setTimeout(() => {}, 5000);
+				setTimeout(() => {}, 3000);
 			}
 		});
 	}

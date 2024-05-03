@@ -1,7 +1,9 @@
 const editMessage = require('../lib/telegram/wb_acceptance_rate/editMessage');
 const sendMessage = require('../lib/telegram/wb_acceptance_rate/sendMessage');
+const deleteMessage = require('../lib/telegram/wb_acceptance_rate/deleteMessage');
 const { warehouse } = require('../lib/wb_warehouse');
 const client = require('../lib/supabase/wb_acceptance/client');
+const cal = require('../lib/calendar');
 
 interface CallBackQuery {
 	id: string;
@@ -35,13 +37,6 @@ exports.handler = async function (event, ctx) {
 		const {
 			message,
 			callback_query,
-			edited_message,
-			channel_post,
-			message_reaction,
-			pre_checkout_query,
-			chat_member,
-			my_chat_member,
-			chat_join_request,
 		}: {
 			callback_query: CallBackQuery;
 			message: any;
@@ -56,14 +51,15 @@ exports.handler = async function (event, ctx) {
 
 		//обработка callback кнопок
 		if (callback_query) {
-			console.log('callback_query ', callback_query);
+			//количество строк списка складов
+			let pageSize = 10;
+			// console.log('callback_query ', callback_query);
 			let { message } = callback_query;
-			let { chat, from } = message;
+			let { chat } = message;
 			let user_id = chat.id;
 
 			if (callback_query?.data) {
-				let { start, wh_id, delivery_type, delivery_date, delivery_date_title, coef } = JSON.parse(callback_query?.data);
-				let pageSize = 10;
+				let { start, wh_id, delivery_type, delivery_date, coef, calendar, month, year, day } = JSON.parse(callback_query?.data);
 
 				if (start >= 0) {
 					const { data, error } = await client
@@ -97,6 +93,7 @@ exports.handler = async function (event, ctx) {
 					//TODO: если вдруг начало списка складов меньше 0 - ничего не делаем
 				}
 
+				//если выбран склад - выбираем тип поставки
 				if (wh_id) {
 					await editMessage(chat.id, message.message_id, null, 'Введите тип поставки', {
 						inline_keyboard: [
@@ -107,27 +104,79 @@ exports.handler = async function (event, ctx) {
 					});
 
 					const { data: states, error } = await client.from('states').upsert({ user_id, step: 'wh_id', wh_id });
-					console.log('states ', states);
-					console.log('error ', error);
 				}
 
+				//если выбран тип поставки - выбираем дату поставки
 				if (delivery_type) {
-					let today = new Date().toISOString().split('T')[0];
-					let tomorrow = new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0];
-					let week = new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0];
+					let year = new Date().getFullYear();
+					let month = new Date().getMonth() + 1;
 
-					await editMessage(chat.id, message.message_id, null, 'Выберите дату', {
+					let _currentMonth = new Date(year, month - 1).toLocaleString('ru-RU', { month: 'long' });
+					let currentMonth = _currentMonth[0].toUpperCase() + _currentMonth.slice(1);
+
+					let res = cal(year, month);
+					await editMessage(chat.id, message.message_id, null, 'Выберите дату поставки', {
 						inline_keyboard: [
-							[{ callback_data: JSON.stringify({ delivery_date_title: 'today', delivery_date: today }), text: 'Сегодня' }],
-							[{ callback_data: JSON.stringify({ delivery_date_title: 'tomorrow', delivery_date: tomorrow }), text: 'Завтра' }],
-							[{ callback_data: JSON.stringify({ delivery_date_title: 'week', delivery_date: week }), text: 'В течение недели' }],
+							[
+								{ text: '<', callback_data: JSON.stringify({ calendar: true, year, month: month - 1 }) },
+								{ text: currentMonth, callback_data: '{}' },
+								{ text: '>', callback_data: JSON.stringify({ calendar: true, year, month: month + 1 }) },
+							],
+							[
+								{ text: 'Пн', callback_data: '{}' },
+								{ text: 'Вт', callback_data: '{}' },
+								{ text: 'Ср', callback_data: '{}' },
+								{ text: 'Чт', callback_data: '{}' },
+								{ text: 'Пт', callback_data: '{}' },
+								{ text: 'Сб', callback_data: '{}' },
+								{ text: 'Вс', callback_data: '{}' },
+							],
+							...res,
 						],
 					});
-					await client.from('states').upsert({ user_id, step: 'delivery_type', delivery_type });
+
+					await client.from('states').upsert({ user_id, step: 'delivery_date', delivery_date });
 				}
 
-				if (delivery_date) {
-					await editMessage(chat.id, message.message_id, null, 'Выберите коээфициент', {
+				//если выбран день
+				if (day) {
+					let monthFormat = `${month < 10 ? '0' + month : month}`;
+					delivery_date = `${year}-${month}-${day}`;
+					await editMessage(chat.id, message.message_id, null, `Выбрана дата:\n${day}.${monthFormat}.${year}`, {
+						inline_keyboard: [[]],
+					});
+					await client.from('states').upsert({ user_id, step: 'delivery_date', delivery_date });
+				}
+
+				//если листаем месяцы
+				if (calendar) {
+					let _currentMonth = new Date(year, month - 1).toLocaleString('ru-RU', { month: 'long' });
+					let currentMonth = _currentMonth[0].toUpperCase() + _currentMonth.slice(1);
+
+					let res = cal(year, month);
+					await editMessage(chat.id, message.message_id, null, 'Выберите дату поставки', {
+						inline_keyboard: [
+							[
+								{ text: '<', callback_data: JSON.stringify({ calendar: true, month: month - 1, year }) },
+								{ text: currentMonth, callback_data: '{}' },
+								{ text: '>', callback_data: JSON.stringify({ calendar: true, month: month + 1, year }) },
+							],
+							[
+								{ text: 'Пн', callback_data: '{}' },
+								{ text: 'Вт', callback_data: '{}' },
+								{ text: 'Ср', callback_data: '{}' },
+								{ text: 'Чт', callback_data: '{}' },
+								{ text: 'Пт', callback_data: '{}' },
+								{ text: 'Сб', callback_data: '{}' },
+								{ text: 'Вс', callback_data: '{}' },
+							],
+							...res,
+						],
+					});
+				}
+
+				if (year) {
+					let mes = await editMessage(chat.id, message.message_id, null, 'Выберите коээфициент', {
 						inline_keyboard: [
 							[{ callback_data: JSON.stringify({ coef: 0 }), text: 'Бесплатно' }],
 							[
@@ -148,26 +197,16 @@ exports.handler = async function (event, ctx) {
 							[{ callback_data: JSON.stringify({ coef: 10 }), text: 'х10 и менее' }],
 						],
 					});
-
-					let today = new Date().toISOString().split('T')[0];
-
-					if (delivery_date_title == 'week') {
-						const { data, error } = await client
-							.from('states')
-							.upsert({ user_id, step: 'delivery_date', delivery_date, delivery_date_start: today })
-							.select('*');
-						console.log('data delivery_date', data);
-						console.log('error delivery_date', error);
-					} else {
-						const { data, error } = await client.from('states').upsert({ user_id, step: 'delivery_date', delivery_date }).select('*');
-						console.log('data delivery_date', data);
-						console.log('error delivery_date', error);
-					}
+					let state = await client.from('states').upsert({ user_id, step: 'coef', coef });
+					console.log('Выберите коээфициент: ', coef);
+					console.log('mes: ', mes);
+					console.log('state: ', state);
 				}
 
 				if (coef >= 0) {
+					console.log('year ', year);
 					const {
-						data: { wh_id, delivery_date, delivery_type, delivery_date_start },
+						data: { wh_id, delivery_date, delivery_type },
 					} = await client.from('states').select('*').eq('user_id', user_id).single();
 
 					const { data: request, error } = await client
@@ -178,36 +217,29 @@ exports.handler = async function (event, ctx) {
 							wh_id,
 							delivery_date,
 							delivery_type,
-							delivery_date_start,
 							coef,
 						})
 						.select('*, warehouses (id, title), coefficients (title), delivery_types (title)')
 						.single();
 
-					console.log('request', request);
-					console.log('error', error);
-
-					await editMessage(
-						user_id,
-						message.message_id,
-						null,
-						`Ваш запрос принят\n<b>Выбранный склад: </b>${request.warehouses?.title} (${request.wh_id})\n<b>Дата поставки: </b> ${
-							delivery_date_start ? new Date(delivery_date_start).toLocaleDateString('ru-RU') + ' - ' : ''
-						} ${new Date(request.delivery_date).toLocaleDateString('ru-RU')}\n<b>Тип поставки: </b> ${
-							request.delivery_types.title
-						}\n<b>Требуемый коэффициент: </b>${request.coef} (${request.coefficients.title})`
+					await deleteMessage(chat.id, message.message_id);
+					await sendMessage(
+						chat.id,
+						`Ваш запрос принят\n<b>Выбранный склад: </b>${request.warehouses?.title} (${request.wh_id})\n<b>Дата поставки:</b> ${new Date(
+							request.delivery_date
+						).toLocaleDateString('ru-RU')}\n<b>Тип поставки: </b> ${request.delivery_types.title}\n<b>Требуемый коэффициент: </b>${
+							request.coef
+						} (${request.coefficients.title})`
 					);
 
-					const { data, error: err } = await client.from('states').update({ step: null }).eq('user_id', user_id).select();
-					console.log('data coef', data);
-					console.log('error coef', err);
+					await client.from('states').update({ step: null }).eq('user_id', user_id);
 				}
 			}
 		}
 
 		if (message) {
 			// console.log('message ', message);
-			const { chat, text, from } = message;
+			const { chat, text } = message;
 			const { data: user } = await client.from('users').select('*').eq('id', chat.id).single();
 
 			if (text === '/add') {
@@ -231,31 +263,8 @@ exports.handler = async function (event, ctx) {
 					.select('*, warehouses (title), coefficients (title), delivery_types (title)')
 					.eq('is_active', true)
 					.filter('delivery_date', 'gte', new Date().toISOString().split('T')[0]);
-				console.log('data', data);
-				console.log('error', error);
-
-				data.forEach(async (req, n) => {
-					let delivery_date = new Date(req.delivery_date).toISOString();
-					let delivery_date_start = new Date(req.delivery_date_start).toISOString();
-					let today = new Date().toISOString();
-
-					if (today <= delivery_date) {
-						await client.from('requests').update({ is_active: false }).eq('id', req.id);
-						// await sendMessage(
-						// 	chat.id,
-						// 	`Доступна приёмка:\n📦 › ${req.warehouses.title} › ${req.delivery_types.title} › ${req.coefficients.title} › ${
-						// 		req.delivery_date_start ? new Date(delivery_date_start).toLocaleDateString('ru-RU') + ' - ' : ''
-						// 	} ${new Date(delivery_date).toLocaleDateString('ru-RU')}\n`
-						// );
-						await sendMessage(
-							300366843,
-							`Доступна приёмка:\n📦 › ${req.warehouses.title} › ${req.delivery_types.title} › ${req.coefficients.title} › ${
-								req.delivery_date_start ? new Date(delivery_date_start).toLocaleDateString('ru-RU') + ' - ' : ''
-							} ${new Date(delivery_date).toLocaleDateString('ru-RU')}\n`
-						);
-					}
-					setTimeout(() => {}, 5000);
-				});
+				console.log(data);
+				console.log(error);
 			}
 
 			if (text === '/mylimits') {
