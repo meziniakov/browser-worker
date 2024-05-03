@@ -10,10 +10,10 @@ export default async (req) => {
 		.select('*, warehouses (title), coefficients (title), delivery_types (title)')
 		.eq('is_active', true)
 		.filter('delivery_date', 'gte', new Date().toISOString().split('T')[0]);
+	console.log('requests: ', data);
 
 	if (data.length > 0) {
 		data.forEach(async (req, n) => {
-			let delivery_date = new Date(req.delivery_date).toISOString();
 			try {
 				const response = await fetch('https://coef.wbcon.su/get_coef', {
 					method: 'POST',
@@ -34,13 +34,13 @@ export default async (req) => {
 					await sendMessage(
 						chat.id,
 						`Доступна приёмка:\n📦 › ${req.warehouses.title} › ${req.delivery_types.title} › ${req.coefficients.title} › ${new Date(
-							delivery_date
+							req.delivery_date
 						).toLocaleDateString('ru-RU')}\n`
 					);
 					await sendMessage(
 						305905070,
 						`Доступна приёмка:\n📦 › ${req.warehouses.title} › ${req.delivery_types.title} › ${req.coefficients.title} › ${new Date(
-							delivery_date
+							req.delivery_date
 						).toLocaleDateString('ru-RU')}\n`
 					);
 				}
