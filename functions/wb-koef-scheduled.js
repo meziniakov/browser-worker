@@ -3,8 +3,7 @@ const client = require('../lib/supabase/wb_acceptance/client');
 const https = require('https');
 
 export default async (req) => {
-	process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = 0;
-	// let test = await sendMessage(305905070, `Пробное сообщение`);
+	process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
 
 	const { data, error } = await client
 		.from('requests')
@@ -12,15 +11,12 @@ export default async (req) => {
 		.eq('is_active', true)
 		.filter('delivery_date', 'gte', new Date().toISOString().split('T')[0]);
 
-	if (data) {
+	if (data.length > 0) {
 		data.forEach(async (req, n) => {
 			let delivery_date = new Date(req.delivery_date).toISOString();
 			try {
 				const response = await fetch('https://coef.wbcon.su/get_coef', {
 					method: 'POST',
-					agent: new https.Agent({
-						rejectUnauthorized: false,
-					}),
 					headers: {
 						'Content-Type': 'application/json',
 						'User-Agent': 'Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.111 Safari/537.36',
