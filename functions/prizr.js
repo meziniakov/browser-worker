@@ -179,6 +179,9 @@ exports.handler = async function (event, ctx) {
 						// 	}`
 						// );
 					}
+					const { data, error } = await client.from('contest_config').update('status', 'done').eq('id', contest.id);
+					console.log('contest done: ', data);
+					console.log('contest done error: ', error);
 				}
 			} else {
 				return { statusCode: 200 };
