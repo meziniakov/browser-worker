@@ -19,15 +19,25 @@ export default async (req) => {
 		for await (const contest of finish_date_array) {
 			const { data: winners, error: winnerError } = await client.rpc('get_random_users_winner', { chatid: contest?.chat_id });
 
-			if (winners?.length) {
-				await sendMessage(chat.id, `Поздравляем победителей:\n${winner_message.join('\n')}`);
+			if (winners?.length > 0) {
+				for await (const winner of winners) {
+					await sendMessage(winner.user_id, `Поздравляем, вы стали победителем в конкурсе ${contest.title}`);
+				}
+				await sendMessage(from.id, `Поздравляем победителей:\n${winner_message.join('\n')}`);
 				await sendMessage(
 					chat.id,
 					`Конкурс "${contest.title}":\n${
 						winners.length == 0 ? 'Нет победителей\n' : winners.map((i, _) => `${++_}. ${i.first_name} ${i.last_name}`).join('\n')
 					}`
 				);
+
+				// winner_message.push(
+				// 	`Конкурс "${contes
+				// 		winners.length == 0 ? 'Нет победителей\n' : winners.map((i, _) => `${++_}. ${i.first_name} ${i.last_name}`).join('\n')
+				// 	}`
+				// );
 			}
+			const { data, error } = await client.from('contest_config').update({ status: 'done' }).eq('id', contest.id).select('*');
 		}
 	} else {
 		return { statusCode: 200 };
