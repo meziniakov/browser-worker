@@ -21,7 +21,7 @@ export default async (req) => {
 
 			if (winners?.length > 0) {
 				await sendMessage(
-					chat.id,
+					contest?.chat_id,
 					`Конкурс "${contest.title}":\n${
 						winners.length > 0 ? winners.map((i, _) => `${++_}. ${i.first_name} ${i.last_name}`).join('\n') : 'Нет победителей\n'
 					}`
