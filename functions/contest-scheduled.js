@@ -9,7 +9,7 @@ export default async (req) => {
 	//return finish_date_array[]
 	const { data: finish_date_array, error: finishDateArrayError } = await client
 		.rpc('get_all_finish_date')
-		.select('title, status, winner_count, chat_id')
+		.select('id, title, status, winner_count, chat_id')
 		.eq('status', 'pending');
 
 	//3. Если массив конкурсов не пустой - проходим в цикле по конкурсам и последовательно запрашиваем chat_member со статусом member и выбираем рандомно winner_count
@@ -30,7 +30,8 @@ export default async (req) => {
 					await sendMessage(winner.user_id, `Поздравляем, вы стали победителем в конкурсе ${contest.title}`);
 				}
 			}
-			const { data, error } = await client.from('contest_config').update({ status: 'done' }).eq('id', contest.id).select('*');
+			const { data, error } = await client.from('contest_config').update({ status: 'done' }).eq('id', contest?.id).select('*');
+			console.log(' contest?.chat_id: ', contest?.chat_id);
 			console.log('contest done: ', data);
 			console.log('contest done error: ', error);
 		}
